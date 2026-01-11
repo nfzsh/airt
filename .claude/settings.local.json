@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn clean compile:*)",
+      "Bash(where mvn)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(cmd /c \"cd /d D:\\\\code\\\\airt && mvnw.cmd clean compile -DskipTests\")",
+      "Bash(cmd:*)",
+      "mcp__web-search-prime__webSearchPrime",
+      "mcp__web-reader__webReader",
+      "Bash(git -C D:/code/airt status)",
+      "Bash(git -C D:/code/airt log:*)",
+      "Bash(git -C D:/code/airt remote -v)",
+      "Bash(git init:*)",
+      "Bash(git config:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

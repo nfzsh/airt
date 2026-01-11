@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Roundtable - 智能认知圆桌</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1>🪑 AI Roundtable</h1>
+                <p class="subtitle">智能认知圆桌 - 群体智慧决策系统</p>
+            </div>
+            <div class="header-right">
+                <button id="newSessionBtn" class="btn btn-primary">新建讨论</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Session Setup Panel -->
+            <div id="setupPanel" class="panel setup-panel">
+                <h2>🎯 创建新讨论</h2>
+                <form id="sessionForm">
+                    <div class="form-group">
+                        <label for="topic">讨论主题</label>
+                        <input type="text" id="topic" name="topic" 
+                               placeholder="例如：是否应该采用 Rust 重构支付网关" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="background">背景信息（可选）</label>
+                        <textarea id="background" name="background" rows="3" 
+                                  placeholder="提供相关背景信息、约束条件等"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>选择参与角色</label>
+                        <div class="role-selector" id="roleSelector">
+                            <!-- 角色列表将通过 JS 动态加载 -->
+                            <div class="loading-roles">加载角色中...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-large">开始讨论</button>
+                        <button type="button" id="cancelSetupBtn" class="btn btn-secondary">取消</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Discussion Panel -->
+            <div id="discussionPanel" class="panel discussion-panel" style="display: none;">
+                <div class="discussion-header">
+                    <div class="header-left">
+                        <h2 id="sessionTopic">讨论主题</h2>
+                        <button id="toggleLayoutBtn" class="btn btn-outline btn-sm">📁 折叠/展开</button>
+                    </div>
+                    <div class="session-controls">
+                        <button id="pauseBtn" class="btn btn-warning">暂停</button>
+                        <button id="resumeBtn" class="btn btn-success" style="display: none;">继续</button>
+                        <div class="round-control">
+                            <select id="roundCount" class="round-count-select">
+                                <option value="1">1轮</option>
+                                <option value="3">3轮</option>
+                                <option value="5">5轮</option>
+                                <option value="10">10轮</option>
+                            </select>
+                            <button id="nextRoundBtn" class="btn btn-primary">推进</button>
+                        </div>
+                        <button id="endDiscussionBtn" class="btn btn-danger">结束讨论</button>
+                    </div>
+                </div>
+
+                <div class="discussion-layout" id="discussionLayout">
+                    <!-- Discussion Stream -->
+                    <div class="discussion-stream">
+                        <div class="section-header">
+                            <h3>💬 讨论流</h3>
+                            <button class="toggle-btn" data-target="discussionHistory">−</button>
+                        </div>
+                        <div id="discussionHistory" class="discussion-history">
+                            <!-- Discussion rounds will be added here -->
+                        </div>
+
+                        <!-- Human Input -->
+                        <div class="human-input-section">
+                            <div class="input-header">
+                                <span class="input-header-icon">💬</span>
+                                <span class="input-header-text">参与讨论</span>
+                            </div>
+                            <div class="input-container">
+                                <textarea
+                                    id="humanInput"
+                                    class="human-input-textarea"
+                                    placeholder="输入你的观点、问题或补充信息..."
+                                    rows="3"></textarea>
+                                <div class="input-actions">
+                                    <span class="input-hint">按 Ctrl+Enter 发送</span>
+                                    <button id="sendHumanInputBtn" class="btn btn-primary">
+                                        <span class="btn-icon">📤</span>
+                                        <span class="btn-text">发送</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Shared Blackboard -->
+                    <div class="shared-blackboard">
+                        <div class="section-header">
+                            <h3>📋 公共白板</h3>
+                            <button class="toggle-btn" data-target="blackboardSections">−</button>
+                        </div>
+
+                        <div class="blackboard-sections" id="blackboardSections">
+                            <!-- Discussion Summary -->
+                            <div class="blackboard-section summary-section">
+                                <h4>📝 讨论摘要</h4>
+                                <div id="discussionSummary" class="summary-content">
+                                    <div class="empty-message">暂无摘要</div>
+                                </div>
+                            </div>
+
+                            <!-- Key Insights -->
+                            <div class="blackboard-section">
+                                <h4>🔍 关键洞察</h4>
+                                <div id="keyInsights" class="insight-list">
+                                    <!-- Insights will be added here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Consensus Points -->
+                            <div class="blackboard-section">
+                                <h4>✅ 已达成共识</h4>
+                                <div id="consensusPoints" class="consensus-list">
+                                    <!-- Consensus points will be added here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Conflicts -->
+                            <div class="blackboard-section">
+                                <h4>⚔️ 分歧点</h4>
+                                <div id="conflictMap" class="conflict-list">
+                                    <!-- Conflicts will be added here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Pending Questions -->
+                            <div class="blackboard-section">
+                                <h4>❓ 待解决问题</h4>
+                                <div id="pendingQuestions" class="question-list">
+                                    <!-- Questions will be added here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- God Mode Console -->
+            <div id="godModeConsole" class="panel god-mode-panel" style="display: none;">
+                <h3>🎮 上帝视角控制台</h3>
+                
+                <div class="god-mode-controls">
+                    <div class="control-group">
+                        <h4>定向提问</h4>
+                        <select id="targetAgentSelect">
+                            <option value="">选择目标角色</option>
+                        </select>
+                        <textarea id="directedQuestion" rows="2" 
+                                  placeholder="输入你的问题..."></textarea>
+                        <button id="askQuestionBtn" class="btn btn-primary">提问</button>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h4>耳语 (Whisper)</h4>
+                        <textarea id="whisperMessage" rows="2" 
+                                  placeholder="给主持人的私信..."></textarea>
+                        <button id="sendWhisperBtn" class="btn btn-secondary">发送</button>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h4>强制验证</h4>
+                        <textarea id="verifyStatement" rows="2" 
+                                  placeholder="选中一句话进行验证..."></textarea>
+                        <button id="forceVerifyBtn" class="btn btn-info">验证</button>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h4>改变焦点</h4>
+                        <input type="text" id="newFocus" placeholder="新的讨论焦点...">
+                        <button id="changeFocusBtn" class="btn btn-warning">改变焦点</button>
+                    </div>
+                </div>
+                
+                <button id="toggleGodModeBtn" class="btn btn-outline">隐藏控制台</button>
+            </div>
+        </main>
+
+        <!-- Decision Package Modal -->
+        <div id="decisionModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>📋 决策报告</h2>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="decisionPackageContent">
+                        <!-- Decision package content will be loaded here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="downloadReportBtn" class="btn btn-primary">下载报告</button>
+                    <button id="closeModalBtn" class="btn btn-secondary">关闭</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>AI 正在思考中...</p>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app-new.js"></script>
+</body>
+</html>

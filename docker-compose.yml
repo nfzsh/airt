@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: airt-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - airt-network
+
+  # Backend
+  backend:
+    build: .
+    container_name: airt-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    depends_on:
+      - redis
+    networks:
+      - airt-network
+    volumes:
+      - ./logs:/app/logs
+
+  # Frontend
+  frontend:
+    image: nginx:alpine
+    container_name: airt-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+    networks:
+      - airt-network
+
+volumes:
+  redis_data:
+
+networks:
+  airt-network:
+    driver: bridge
