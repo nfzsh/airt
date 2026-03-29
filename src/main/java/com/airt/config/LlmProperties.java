@@ -89,7 +89,7 @@ public class LlmProperties {
         public boolean hasValidApiKey() {
             return apiKey != null && !apiKey.isEmpty()
                     && !apiKey.equals("your-api-key-here")
-                    && !apiKey.equals("sk-884cfbbafcd04ecb9864964f7e67b353"); // 示例 key
+                    && !apiKey.equals("your-api-key-here");
         }
     }
 

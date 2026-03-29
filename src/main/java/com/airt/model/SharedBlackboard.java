@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 公共白板模型
@@ -151,7 +152,7 @@ public class SharedBlackboard {
     /**
      * 添加洞察
      */
-    public void addInsight(KeyInsight insight) {
+    public synchronized void addInsight(KeyInsight insight) {
         this.keyInsights.add(insight);
         this.lastUpdated = System.currentTimeMillis();
     }
@@ -159,7 +160,7 @@ public class SharedBlackboard {
     /**
      * 更新洞察状态
      */
-    public void updateInsightStatus(String insightId, KeyInsight.InsightStatus status) {
+    public synchronized void updateInsightStatus(String insightId, KeyInsight.InsightStatus status) {
         this.keyInsights.stream()
             .filter(i -> i.getId().equals(insightId))
             .findFirst()
@@ -170,7 +171,7 @@ public class SharedBlackboard {
     /**
      * 添加共识点
      */
-    public void addConsensus(String point) {
+    public synchronized void addConsensus(String point) {
         this.consensusPoints.add(point);
         this.lastUpdated = System.currentTimeMillis();
     }
@@ -178,8 +179,55 @@ public class SharedBlackboard {
     /**
      * 添加冲突点
      */
-    public void addConflict(ConflictPoint conflict) {
+    public synchronized void addConflict(ConflictPoint conflict) {
         this.conflictPoints.add(conflict);
         this.lastUpdated = System.currentTimeMillis();
+    }
+
+    /**
+     * 更新讨论摘要（同步方法，供外部调用）
+     */
+    public synchronized void updateDiscussionSummary(String summary) {
+        this.discussionSummary = summary;
+        this.lastUpdated = System.currentTimeMillis();
+    }
+
+    /**
+     * 非 scribe 角色提案洞察
+     */
+    public synchronized void proposeInsight(String text, String proposer) {
+        KeyInsight insight = KeyInsight.builder()
+                .id("INS-" + UUID.randomUUID().toString().substring(0, 8))
+                .text(text)
+                .proponent(proposer)
+                .status(KeyInsight.InsightStatus.PROPOSED)
+                .build();
+        this.keyInsights.add(insight);
+        this.lastUpdated = System.currentTimeMillis();
+    }
+
+    /**
+     * 质疑已有洞察
+     */
+    public synchronized void challengeInsight(String insightId, String reason) {
+        this.keyInsights.stream()
+                .filter(i -> i.getId().equals(insightId))
+                .findFirst()
+                .ifPresent(i -> {
+                    i.setStatus(KeyInsight.InsightStatus.CONTESTED);
+                    i.getCounterArguments().add(reason);
+                });
+        this.lastUpdated = System.currentTimeMillis();
+    }
+
+    /**
+     * 获取冲突点列表（作为简单字符串，供 AgentSelector 使用）
+     */
+    public List<String> getConflictMap() {
+        List<String> result = new ArrayList<>();
+        for (ConflictPoint cp : conflictPoints) {
+            result.add(cp.getTopic());
+        }
+        return result;
     }
 }

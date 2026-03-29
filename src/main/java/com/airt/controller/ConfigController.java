@@ -3,6 +3,7 @@ package com.airt.controller;
 import com.airt.config.AirtProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,7 @@ import java.util.stream.Collectors;
  * 配置查询控制器
  * 提供给前端的配置查询接口
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/config")
 @RequiredArgsConstructor
@@ -28,15 +30,8 @@ public class ConfigController {
      */
     @GetMapping("/roles")
     public ResponseEntity<List<RoleConfigDTO>> getRoles() {
-        // 调试：打印配置加载情况
-        System.out.println("=== DEBUG: Loading roles ===");
-        System.out.println("Total roles: " + airtProperties.getRoles().size());
-
         List<RoleConfigDTO> roles = airtProperties.getRoles().stream()
-                .map(role -> {
-                    System.out.println("Role: " + role.getRoleId() + ", displayName: " + role.getDisplayName());
-                    return toRoleConfigDTO(role);
-                })
+                .map(this::toRoleConfigDTO)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(roles);
@@ -49,7 +44,7 @@ public class ConfigController {
     @GetMapping("/roles/{roleId}")
     public ResponseEntity<RoleConfigDTO> getRole(@PathVariable String roleId) {
         return airtProperties.getRoles().stream()
-                .filter(role -> role.getRoleId().equals(roleId))
+                .filter(role -> roleId.equals(role.getRoleId()))
                 .findFirst()
                 .map(this::toRoleConfigDTO)
                 .map(ResponseEntity::ok)
@@ -75,7 +70,7 @@ public class ConfigController {
     @GetMapping("/mcp-profiles/{profileId}")
     public ResponseEntity<MCPProfileConfigDTO> getMCPProfile(@PathVariable String profileId) {
         return airtProperties.getMcpProfiles().stream()
-                .filter(profile -> profile.getProfileId().equals(profileId))
+                .filter(profile -> profileId.equals(profile.getProfileId()))
                 .findFirst()
                 .map(this::toMCPProfileConfigDTO)
                 .map(ResponseEntity::ok)
@@ -101,7 +96,7 @@ public class ConfigController {
     @GetMapping("/prompt-templates/{templateId}")
     public ResponseEntity<PromptTemplateConfigDTO> getPromptTemplate(@PathVariable String templateId) {
         return airtProperties.getPromptTemplates().stream()
-                .filter(template -> template.getTemplateId().equals(templateId))
+                .filter(template -> templateId.equals(template.getTemplateId()))
                 .findFirst()
                 .map(this::toPromptTemplateConfigDTO)
                 .map(ResponseEntity::ok)
@@ -144,10 +139,10 @@ public class ConfigController {
     }
 
     private MCPProfileConfigDTO toMCPProfileConfigDTO(AirtProperties.MCPProfileConfig profile) {
-        return MCPProfileConfigDTO.builder()
+        MCPProfileConfigDTO.MCPProfileConfigDTOBuilder builder = MCPProfileConfigDTO.builder()
                 .profileId(profile.getProfileId())
                 .description(profile.getDescription())
-                .capabilities(profile.getCapabilities().stream()
+                .capabilities(profile.getCapabilities() != null ? profile.getCapabilities().stream()
                         .map(cap -> CapabilityDTO.builder()
                                 .name(cap.getName())
                                 .description(cap.getDescription())
@@ -155,13 +150,17 @@ public class ConfigController {
                                 .required(cap.isRequired())
                                 .config(cap.getConfig())
                                 .build())
-                        .collect(Collectors.toList()))
-                .rateLimit(RateLimitDTO.builder()
-                        .perMinute(profile.getRateLimit().getPerMinute())
-                        .perHour(profile.getRateLimit().getPerHour())
-                        .onExceed(profile.getRateLimit().getOnExceed())
-                        .build())
-                .build();
+                        .collect(Collectors.toList()) : List.of());
+
+        if (profile.getRateLimit() != null) {
+            builder.rateLimit(RateLimitDTO.builder()
+                    .perMinute(profile.getRateLimit().getPerMinute())
+                    .perHour(profile.getRateLimit().getPerHour())
+                    .onExceed(profile.getRateLimit().getOnExceed())
+                    .build());
+        }
+
+        return builder.build();
     }
 
     private PromptTemplateConfigDTO toPromptTemplateConfigDTO(AirtProperties.PromptTemplateConfig template) {

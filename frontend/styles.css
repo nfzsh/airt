@@ -1210,3 +1210,35 @@ body {
     flex-direction: column;
     min-height: 200px;
 }
+
+/* Convergence Banner */
+.convergence-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    margin: 1rem 0;
+    border-radius: 0.5rem;
+    border-left: 4px solid #ed8936;
+    background: #fffaf0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    animation: slideIn 0.3s ease-out;
+}
+
+.convergence-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.convergence-text strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #c05621;
+}
+
+.convergence-text p {
+    font-size: 0.875rem;
+    color: #744210;
+    line-height: 1.4;
+    margin-top: 0.25rem;
+}

@@ -178,8 +178,11 @@
                     
                     <div class="control-group">
                         <h4>耳语 (Whisper)</h4>
-                        <textarea id="whisperMessage" rows="2" 
-                                  placeholder="给主持人的私信..."></textarea>
+                        <select id="whisperTargetAgent" style="width:100%;margin-bottom:8px;">
+                            <option value="">选择目标角色</option>
+                        </select>
+                        <textarea id="whisperMessage" rows="2"
+                                  placeholder="输入私信内容（仅目标角色可见）..."></textarea>
                         <button id="sendWhisperBtn" class="btn btn-secondary">发送</button>
                     </div>
                     

@@ -15,7 +15,27 @@
       "Bash(git init:*)",
       "Bash(git config:*)",
       "Bash(git remote add:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(find /d/code/airt/src/main/java -type f -name \"*.java\" -exec ls -lh {})",
+      "Bash(find /d/code/airt/src/test -type f -name *.java -exec ls -lh {})",
+      "Bash(2)",
+      "Bash(find /d/code/airt/frontend -type f -exec ls -lh {})",
+      "Bash(find /d/code/airt/docs -type f -exec ls -lh {})",
+      "Bash(find /d/code/airt/src/main/resources -type f -exec ls -lh {})",
+      "Bash(find /d/code/airt/.mvn -type f -exec ls -lh {})",
+      "Bash(find /d/code/airt -type f -name \"*.md\" ! -path \"*/target/*\" ! -path \"*/.git/*\" -exec ls -lh {})",
+      "Bash(find /d/code/airt -maxdepth 1 -type f -exec ls -lh {})",
+      "Bash(find /d/code/airt -name \".gitignore\" -o -name \"Dockerfile\" -o -name \"nginx.conf\" -exec ls -lh {})",
+      "Bash(find /d/code/airt/src/main/java/com/airt/fsm -type f -name \"*.java\" -exec ls -lh {})",
+      "Bash(find /d/code/airt -type f -name \"*.xml\" ! -path \"*/target/*\" ! -path \"*/.git/*\" -exec ls -lh {})",
+      "Bash(./mvnw compile:*)",
+      "Bash(ls /d/code/airt/mvnw*)",
+      "Bash(cmd.exe /c \"mvnw.cmd compile -q\" 2>&1)",
+      "Bash(cmd.exe /c \"cd /d D:\\\\code\\\\airt && mvnw.cmd compile -q\" 2>&1)",
+      "Bash(cmd.exe /c \"D:\\\\code\\\\airt\\\\mvnw.cmd compile -f D:\\\\code\\\\airt\\\\pom.xml -q\" 2>&1)",
+      "Bash(cmd.exe /c \"where mvn\")"
     ]
   }
 }

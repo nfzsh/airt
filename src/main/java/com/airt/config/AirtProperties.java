@@ -24,6 +24,11 @@ public class AirtProperties {
     private SessionConfig session = new SessionConfig();
 
     /**
+     * 工具配置
+     */
+    private ToolsConfig tools = new ToolsConfig();
+
+    /**
      * 角色定义列表
      */
     private List<RoleConfig> roles = new ArrayList<>();
@@ -37,6 +42,49 @@ public class AirtProperties {
      * Prompt 模板配置列表
      */
     private List<PromptTemplateConfig> promptTemplates = new ArrayList<>();
+
+    /**
+     * 工具配置
+     */
+    @Data
+    public static class ToolsConfig {
+        private WebSearchConfig webSearch = new WebSearchConfig();
+        private KnowledgeBaseConfig knowledgeBase = new KnowledgeBaseConfig();
+        private MetricsConfig metrics = new MetricsConfig();
+    }
+
+    @Data
+    public static class WebSearchConfig {
+        private boolean enabled = true;
+        private String provider = "tavily";
+        private String apiKey;
+    }
+
+    @Data
+    public static class KnowledgeBaseConfig {
+        private boolean enabled = true;
+        private String type = "filesystem";
+        private List<String> paths = new ArrayList<>();
+    }
+
+    @Data
+    public static class MetricsConfig {
+        private boolean enabled = true;
+        private String endpoint;
+    }
+
+    /**
+     * 通用工具配置（供 ToolExecutor 使用）
+     */
+    @Data
+    public static class ToolConfig {
+        private boolean enabled = true;
+        private String provider;
+        private String apiKey;
+        private String endpoint;
+        private List<String> paths;
+        private Map<String, Object> extra = new HashMap<>();
+    }
 
     /**
      * 会话配置

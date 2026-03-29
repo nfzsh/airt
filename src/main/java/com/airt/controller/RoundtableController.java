@@ -13,10 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * REST API 控制器
@@ -132,11 +130,11 @@ public class RoundtableController {
      * 定向提问
      */
     @PostMapping("/session/{sessionId}/question")
-    public ResponseEntity<Map<String, String>> directQuestion(
+    public ResponseEntity<AgentResponse> directQuestion(
             @PathVariable String sessionId,
             @RequestBody DirectQuestionRequest request) {
-        orchestratorService.directQuestion(sessionId, request.getRoleId(), request.getQuestion());
-        return ResponseEntity.ok(Map.of("status", "questioned"));
+        AgentResponse response = orchestratorService.directQuestion(sessionId, request.getRoleId(), request.getQuestion());
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -151,9 +149,42 @@ public class RoundtableController {
     }
 
     /**
+     * 耳语 — 对特定 Agent 私下注入上下文
+     */
+    @PostMapping("/session/{sessionId}/whisper")
+    public ResponseEntity<Map<String, String>> whisper(
+            @PathVariable String sessionId,
+            @RequestBody WhisperRequest request) {
+        orchestratorService.whisper(sessionId, request.getAgentId(), request.getMessage());
+        return ResponseEntity.ok(Map.of("status", "whispered"));
+    }
+
+    /**
+     * 指定下一个发言者
+     */
+    @PostMapping("/session/{sessionId}/next-speaker")
+    public ResponseEntity<Map<String, String>> setNextSpeaker(
+            @PathVariable String sessionId,
+            @RequestBody NextSpeakerRequest request) {
+        orchestratorService.setNextSpeaker(sessionId, request.getAgentId());
+        return ResponseEntity.ok(Map.of("status", "next-speaker-set"));
+    }
+
+    /**
+     * 改变讨论焦点
+     */
+    @PostMapping("/session/{sessionId}/change-focus")
+    public ResponseEntity<Map<String, String>> changeFocus(
+            @PathVariable String sessionId,
+            @RequestBody ChangeFocusRequest request) {
+        orchestratorService.changeFocus(sessionId, request.getFocus());
+        return ResponseEntity.ok(Map.of("status", "focus-changed"));
+    }
+
+    /**
      * 流式推进讨论一轮（SSE）
      */
-    @GetMapping(value = "/session/{sessionId}/proceed-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/session/{sessionId}/proceed-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> proceedRoundStream(@PathVariable String sessionId) {
         log.info("Received SSE request for session {}", sessionId);
         return orchestratorService.proceedRoundStream(sessionId)
@@ -208,5 +239,38 @@ public class RoundtableController {
         public void setContent(String content) { this.content = content; }
         public Long getTimestamp() { return timestamp; }
         public void setTimestamp(Long timestamp) { this.timestamp = timestamp; }
+    }
+
+    /**
+     * 耳语请求
+     */
+    public static class WhisperRequest {
+        private String agentId;
+        private String message;
+
+        public String getAgentId() { return agentId; }
+        public void setAgentId(String agentId) { this.agentId = agentId; }
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+    }
+
+    /**
+     * 指定发言者请求
+     */
+    public static class NextSpeakerRequest {
+        private String agentId;
+
+        public String getAgentId() { return agentId; }
+        public void setAgentId(String agentId) { this.agentId = agentId; }
+    }
+
+    /**
+     * 改变焦点请求
+     */
+    public static class ChangeFocusRequest {
+        private String focus;
+
+        public String getFocus() { return focus; }
+        public void setFocus(String focus) { this.focus = focus; }
     }
 }

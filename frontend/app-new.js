@@ -8,6 +8,7 @@ class AIRoundtableApp {
         this.godModeVisible = false;
         this.isCreatingSession = false;  // 防止重复提交标志
         this.isProceeding = false;  // 防止重复推进标志
+        this.sessionWs = null;  // WebSocket 连接
 
         this.init();
     }
@@ -25,6 +26,7 @@ class AIRoundtableApp {
     resetUI() {
         this.currentSessionId = null;
         this.isCreatingSession = false;
+        this.disconnectSessionWebSocket();
         document.getElementById('setupPanel').style.display = 'block';
         document.getElementById('discussionPanel').style.display = 'none';
         document.getElementById('discussionHistory').innerHTML = '';
@@ -182,6 +184,9 @@ class AIRoundtableApp {
             // 保存新会话 ID
             this.currentSessionId = result.sessionId;
             console.log('Session created:', this.currentSessionId);
+
+            // 建立 WebSocket 连接接收会话事件
+            this.connectSessionWebSocket(this.currentSessionId);
 
             // 隐藏设置面板
             this.hideSetupPanel();
@@ -542,99 +547,115 @@ class AIRoundtableApp {
     }
 
     /**
-     * 使用 SSE 流式接口推进一轮
+     * 使用 POST + fetch ReadableStream 流式接口推进一轮
      */
     async proceedRoundStream() {
         return new Promise((resolve, reject) => {
-            const eventSource = new EventSource(
-                `${this.roundtableBase}/session/${this.currentSessionId}/proceed-stream`
-            );
-
             let currentAgentInfo = null;
             let currentContent = '';
             let currentRoundElement = null;
 
-            eventSource.onmessage = (event) => {
-                try {
-                    // 添加调试日志
-                    console.log('SSE received:', event.data);
+            fetch(`${this.roundtableBase}/session/${this.currentSessionId}/proceed-stream`, {
+                method: 'POST',
+                headers: { 'Accept': 'text/event-stream' }
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
 
-                    // 检查数据格式
-                    let rawData = event.data.trim();
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                const self = this;
 
-                    // 跳过空消息或注释
-                    if (!rawData || rawData.startsWith(':')) {
-                        return;
-                    }
+                function read() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            resolve();
+                            return;
+                        }
 
-                    // 解析 JSON
-                    const data = JSON.parse(rawData);
-                    console.log('Parsed SSE data:', data);
+                        buffer += decoder.decode(value, { stream: true });
 
-                    switch (data.type) {
-                        case 'start':
-                            // 开始生成
-                            currentAgentInfo = {
-                                agentId: data.agentId,
-                                roleName: data.roleName,
-                                roleDisplayName: data.roleDisplayName,
-                                round: data.round
-                            };
-                            currentContent = '';
+                        // 按 SSE 协议按行解析
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop(); // 保留不完整的行
 
-                            // 创建新的轮次元素
-                            currentRoundElement = this.createStreamingRoundElement(currentAgentInfo);
-                            this.appendRoundToHistory(currentRoundElement);
-                            break;
+                        for (const line of lines) {
+                            const trimmed = line.trim();
 
-                        case 'token':
-                            // 接收到 token，实时更新
-                            currentContent += data.content;
-                            this.updateStreamingContent(currentRoundElement, currentContent);
-                            break;
-
-                        case 'complete':
-                            // 完成，保存到历史
-                            const response = data.response;
-                            this.finalizeStreamingRound(currentRoundElement, response);
-
-                            // 更新白板
-                            if (response.blackboardUpdate) {
-                                // 需要从后端获取最新的白板数据
-                                this.loadSessionInfo();
+                            // 跳过空行、注释、event/data: 前缀
+                            if (!trimmed || trimmed.startsWith(':') || trimmed.startsWith('event:') || trimmed.startsWith('id:')) {
+                                continue;
                             }
 
-                            eventSource.close();
-                            resolve();
-                            break;
+                            if (trimmed.startsWith('data:')) {
+                                const rawData = trimmed.substring(5).trim();
+                                if (!rawData) continue;
 
-                        case 'error':
-                            // 错误
-                            console.error('Stream error:', data.error);
-                            this.showToast('生成出错: ' + data.error, 'error');
-                            eventSource.close();
-                            reject(new Error(data.error));
-                            break;
+                                try {
+                                    const data = JSON.parse(rawData);
 
-                        default:
-                            console.warn('Unknown SSE message type:', data.type);
-                    }
+                                    switch (data.type) {
+                                        case 'start':
+                                            currentAgentInfo = {
+                                                agentId: data.agentId,
+                                                roleName: data.roleName,
+                                                roleDisplayName: data.roleDisplayName,
+                                                round: data.round
+                                            };
+                                            currentContent = '';
+                                            currentRoundElement = self.createStreamingRoundElement(currentAgentInfo);
+                                            self.appendRoundToHistory(currentRoundElement);
+                                            break;
 
-                } catch (error) {
-                    console.error('Error parsing SSE data:', error);
-                    console.error('Raw data:', event.data);
-                    this.showToast('解析数据失败: ' + error.message, 'error');
-                    eventSource.close();
-                    reject(error);
+                                        case 'token':
+                                            currentContent += data.content;
+                                            self.updateStreamingContent(currentRoundElement, currentContent);
+                                            break;
+
+                                        case 'complete':
+                                            const response = data.response;
+                                            self.finalizeStreamingRound(currentRoundElement, response);
+                                            if (response.blackboardUpdate) {
+                                                self.loadSessionInfo();
+                                            }
+                                            reader.cancel();
+                                            resolve();
+                                            return;
+
+                                        case 'error':
+                                            console.error('Stream error:', data.error);
+                                            self.showToast('生成出错: ' + data.error, 'error');
+                                            reader.cancel();
+                                            reject(new Error(data.error));
+                                            return;
+
+                                        default:
+                                            console.warn('Unknown SSE message type:', data.type);
+                                    }
+                                } catch (error) {
+                                    console.error('Error parsing SSE data:', error, 'Raw:', rawData);
+                                }
+                            }
+                        }
+
+                        read();
+                    }).catch(error => {
+                        if (error.name !== 'AbortError') {
+                            console.error('Stream read error:', error);
+                            self.showToast('连接中断', 'error');
+                            reject(error);
+                        }
+                    });
                 }
-            };
 
-            eventSource.onerror = (error) => {
-                console.error('EventSource error:', error);
-                eventSource.close();
-                this.showToast('连接中断', 'error');
+                read();
+            }).catch(error => {
+                console.error('Fetch error:', error);
+                this.showToast('请求失败: ' + error.message, 'error');
                 reject(error);
-            };
+            });
         });
     }
 
@@ -807,26 +828,50 @@ class AIRoundtableApp {
         }
 
         try {
-            await fetch(`${this.roundtableBase}/session/${this.currentSessionId}/question`, {
+            const response = await fetch(`${this.roundtableBase}/session/${this.currentSessionId}/question`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roleId: targetRoleId, question })
             });
 
+            if (response.ok) {
+                const agentResponse = await response.json();
+                this.showToast(`${agentResponse.roleDisplayName} 已回复`, 'success');
+                await this.loadHistory();
+            } else {
+                this.showToast('发送失败: ' + response.statusText, 'error');
+            }
+
             document.getElementById('directedQuestion').value = '';
-            this.showToast('问题已发送', 'success');
         } catch (error) {
             this.showToast('发送失败', 'error');
         }
     }
 
     async sendWhisper() {
+        const targetRoleId = document.getElementById('whisperTargetAgent')?.value;
         const message = document.getElementById('whisperMessage')?.value.trim();
-        if (!message) {
-            this.showToast('请输入私信内容', 'warning');
+        if (!targetRoleId || !message) {
+            this.showToast('请选择目标角色并输入私信内容', 'warning');
             return;
         }
-        this.showToast('私信功能即将推出', 'info');
+
+        try {
+            const response = await fetch(`${this.roundtableBase}/session/${this.currentSessionId}/whisper`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ agentId: targetRoleId, message })
+            });
+
+            if (response.ok) {
+                this.showToast(`已发送私信给 ${targetRoleId}，下次发言时将收到`, 'success');
+                document.getElementById('whisperMessage').value = '';
+            } else {
+                this.showToast('发送失败: ' + response.statusText, 'error');
+            }
+        } catch (error) {
+            this.showToast('发送失败', 'error');
+        }
     }
 
     async forceVerification() {
@@ -835,7 +880,28 @@ class AIRoundtableApp {
             this.showToast('请输入要验证的内容', 'warning');
             return;
         }
-        this.showToast('验证功能即将推出', 'info');
+
+        try {
+            const response = await fetch(`${this.roundtableBase}/session/${this.currentSessionId}/question`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    roleId: 'devil_advocate',
+                    question: `请验证以下陈述的真实性，给出你的判断和依据：\n"${statement}"`
+                })
+            });
+
+            if (response.ok) {
+                const agentResponse = await response.json();
+                this.showToast(`挑战者已完成验证`, 'success');
+                await this.loadHistory();
+                document.getElementById('verifyStatement').value = '';
+            } else {
+                this.showToast('验证失败: ' + response.statusText, 'error');
+            }
+        } catch (error) {
+            this.showToast('验证失败', 'error');
+        }
     }
 
     async changeFocus() {
@@ -844,7 +910,24 @@ class AIRoundtableApp {
             this.showToast('请输入新的讨论焦点', 'warning');
             return;
         }
-        this.showToast('改变焦点功能即将推出', 'info');
+
+        try {
+            const response = await fetch(`${this.roundtableBase}/session/${this.currentSessionId}/change-focus`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ focus: newFocus })
+            });
+
+            if (response.ok) {
+                this.showToast(`讨论焦点已改变为: ${newFocus}`, 'success');
+                await this.loadSessionInfo();
+                document.getElementById('newFocus').value = '';
+            } else {
+                this.showToast('修改失败: ' + response.statusText, 'error');
+            }
+        } catch (error) {
+            this.showToast('修改失败', 'error');
+        }
     }
 
     showDecisionPackage(data) {
@@ -895,6 +978,83 @@ class AIRoundtableApp {
     hideLoading() {
         const overlay = document.getElementById('loadingOverlay');
         if (overlay) overlay.style.display = 'none';
+    }
+
+    // ========== WebSocket 会话事件 ==========
+
+    connectSessionWebSocket(sessionId) {
+        this.disconnectSessionWebSocket();
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/airt/ws/roundtable/${sessionId}`;
+        this.sessionWs = new WebSocket(wsUrl);
+
+        this.sessionWs.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                this.handleSessionEvent(msg);
+            } catch (e) {
+                console.warn('Failed to parse WebSocket message:', e);
+            }
+        };
+
+        this.sessionWs.onclose = () => {
+            console.log('Session WebSocket closed');
+        };
+
+        this.sessionWs.onerror = (error) => {
+            console.warn('Session WebSocket error:', error);
+        };
+    }
+
+    disconnectSessionWebSocket() {
+        if (this.sessionWs) {
+            this.sessionWs.close();
+            this.sessionWs = null;
+        }
+    }
+
+    handleSessionEvent(msg) {
+        if (!msg) return;
+        const eventType = msg.eventType || msg.type;
+        if (!eventType) return;
+        switch (eventType) {
+            case 'CONVERGENCE_DETECTED':
+                this.showConvergenceBanner(msg.data);
+                break;
+            case 'SESSION_FINISHED':
+                this.showToast('讨论已结束', 'info');
+                break;
+            case 'WHISPER_SENT':
+                this.showToast(`私信已发送给 ${msg.data?.agentId || '目标角色'}`, 'success');
+                break;
+            default:
+                console.log('Session event:', eventType, msg.data);
+        }
+    }
+
+    showConvergenceBanner(data) {
+        const history = document.getElementById('discussionHistory');
+        if (!history) return;
+
+        // 移除已有的收敛横幅
+        const existing = document.querySelector('.convergence-banner');
+        if (existing) existing.remove();
+
+        const banner = document.createElement('div');
+        banner.className = 'convergence-banner';
+        const status = data?.status || 'ACTIVE';
+        const reason = data?.reason || '';
+        const label = status === 'CONVERGED' ? '讨论已收敛' : '讨论趋于收敛';
+        banner.innerHTML = `
+            <div class="convergence-icon">${status === 'CONVERGED' ? '✅' : '⚠️'}</div>
+            <div class="convergence-text">
+                <strong>${label}</strong>
+                <p>${reason}</p>
+                <p>你可以选择继续讨论或结束讨论。</p>
+            </div>
+        `;
+        history.appendChild(banner);
+        banner.scrollIntoView({ behavior: 'smooth' });
     }
 
     showToast(message, type = 'info') {

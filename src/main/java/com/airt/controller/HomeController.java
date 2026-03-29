@@ -17,12 +17,4 @@ public class HomeController {
     public String index() {
         return "forward:/index.html";
     }
-
-    /**
-     * 健康检查页面
-     */
-    @GetMapping("/health")
-    public String health() {
-        return "forward:/index.html";
-    }
 }

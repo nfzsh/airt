@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 公共白板服务
@@ -30,11 +31,15 @@ public class BlackboardService {
      * @param response Agent 响应
      */
     public void updateFromResponse(SharedBlackboard blackboard, AgentResponse response) {
+        if (blackboard == null || response == null) {
+            return;
+        }
+
         // 添加关键洞察
         if (response.getKeyInsights() != null) {
             for (String insight : response.getKeyInsights()) {
                 SharedBlackboard.KeyInsight keyInsight = SharedBlackboard.KeyInsight.builder()
-                        .id("INS-" + System.currentTimeMillis())
+                        .id("INS-" + UUID.randomUUID().toString().substring(0, 8))
                         .text(insight)
                         .proponent(response.getRoleName())
                         .status(SharedBlackboard.KeyInsight.InsightStatus.PROPOSED)
@@ -50,7 +55,7 @@ public class BlackboardService {
 
             // 更新讨论摘要
             if (update.getSummary() != null && !update.getSummary().isBlank()) {
-                blackboard.setDiscussionSummary(update.getSummary());
+                blackboard.updateDiscussionSummary(update.getSummary());
                 log.debug("Updated discussion summary: {}", update.getSummary());
             }
 
@@ -65,7 +70,7 @@ public class BlackboardService {
                 List<SharedBlackboard.ConflictPoint> conflictPoints = new ArrayList<>();
                 for (String conflict : update.getNewConflictPoints()) {
                     SharedBlackboard.ConflictPoint conflictPoint = SharedBlackboard.ConflictPoint.builder()
-                            .id("CONF-" + System.currentTimeMillis() + conflictPoints.size())
+                            .id("CONF-" + UUID.randomUUID().toString().substring(0, 8))
                             .topic(conflict)
                             .type(SharedBlackboard.ConflictPoint.ConflictType.FACTUAL_DISAGREEMENT)
                             .build();
@@ -98,6 +103,38 @@ public class BlackboardService {
                 blackboard.getKeyInsights().size(),
                 blackboard.getConsensusPoints().size(),
                 blackboard.getConflictPoints().size());
+    }
+
+    /**
+     * 处理非 scribe 角色的白板提案操作
+     *
+     * @param blackboard 白板
+     * @param roleId 角色ID
+     * @param publicResponse Agent 的公开响应
+     */
+    public void processNonScribeContributions(SharedBlackboard blackboard, String roleId, String publicResponse) {
+        if (blackboard == null || publicResponse == null) return;
+
+        // 解析 PROPOSE_INSIGHT: <insight text>
+        java.util.regex.Pattern proposePattern = java.util.regex.Pattern.compile(
+                "PROPOSE_INSIGHT:\\s*(.+?)(?=\\n|$)", java.util.regex.Pattern.MULTILINE);
+        java.util.regex.Matcher proposeMatcher = proposePattern.matcher(publicResponse);
+        while (proposeMatcher.find()) {
+            String text = proposeMatcher.group(1).trim();
+            blackboard.proposeInsight(text, roleId);
+            log.info("Insight proposed by {}: {}", roleId, text);
+        }
+
+        // 解析 CHALLENGE_INSIGHT(id): <reason>
+        java.util.regex.Pattern challengePattern = java.util.regex.Pattern.compile(
+                "CHALLENGE_INSIGHT\\(([A-Za-z0-9-]+)\\)\\s*:\\s*(.+?)(?=\\n|$)", java.util.regex.Pattern.MULTILINE);
+        java.util.regex.Matcher challengeMatcher = challengePattern.matcher(publicResponse);
+        while (challengeMatcher.find()) {
+            String insightId = challengeMatcher.group(1);
+            String reason = challengeMatcher.group(2).trim();
+            blackboard.challengeInsight(insightId, reason);
+            log.info("Insight {} challenged by {}: {}", insightId, roleId, reason);
+        }
     }
 
     /**

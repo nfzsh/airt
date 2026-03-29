@@ -58,6 +58,11 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
         private String extractSessionId(WebSocketSession session) {
             String uri = session.getUri().toString();
+            // 去除查询参数
+            int queryIndex = uri.indexOf('?');
+            if (queryIndex >= 0) {
+                uri = uri.substring(0, queryIndex);
+            }
             String[] parts = uri.split("/");
             return parts.length > 0 ? parts[parts.length - 1] : null;
         }

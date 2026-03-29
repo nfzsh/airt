@@ -48,9 +48,9 @@ public class PromptTemplate {
     public String render(java.util.Map<String, Object> context) {
         String result = systemPrompt;
 
-        // 替换变量
-        if (context != null) {
-            for (java.util.Map.Entry<String, Object> entry : context.entrySet()) {
+        // 先替换默认变量（作为 fallback）
+        if (variables != null) {
+            for (java.util.Map.Entry<String, Object> entry : variables.entrySet()) {
                 String placeholder = "{" + entry.getKey() + "}";
                 if (result.contains(placeholder)) {
                     result = result.replace(placeholder, String.valueOf(entry.getValue()));
@@ -58,9 +58,9 @@ public class PromptTemplate {
             }
         }
 
-        // 替换默认变量
-        if (variables != null) {
-            for (java.util.Map.Entry<String, Object> entry : variables.entrySet()) {
+        // 再替换上下文变量（覆盖默认值）
+        if (context != null) {
+            for (java.util.Map.Entry<String, Object> entry : context.entrySet()) {
                 String placeholder = "{" + entry.getKey() + "}";
                 if (result.contains(placeholder)) {
                     result = result.replace(placeholder, String.valueOf(entry.getValue()));

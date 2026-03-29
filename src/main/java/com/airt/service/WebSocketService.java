@@ -82,13 +82,21 @@ public class WebSocketService {
      */
     private void sendToSession(String sessionId, Object message) {
         WebSocketSession session = sessions.get(sessionId);
-        if (session != null && session.isOpen()) {
-            try {
-                String json = objectMapper.writeValueAsString(message);
-                session.sendMessage(new TextMessage(json));
-            } catch (IOException e) {
-                log.error("Error sending message to session {}", sessionId, e);
-            }
+        if (session == null) {
+            log.warn("No WebSocket session registered for {}", sessionId);
+            return;
+        }
+        if (!session.isOpen()) {
+            log.warn("WebSocket session for {} is closed, removing stale entry", sessionId);
+            sessions.remove(sessionId);
+            return;
+        }
+        try {
+            String json = objectMapper.writeValueAsString(message);
+            session.sendMessage(new TextMessage(json));
+        } catch (IOException e) {
+            log.error("Error sending message to session {}", sessionId, e);
+            sessions.remove(sessionId);
         }
     }
 }
